@@ -1,0 +1,18 @@
+language: go
+services:
+  - redis-server
+
+go:
+  - 1.13.x
+  - 1.14.x
+  - master
+
+matrix:
+  allow_failures:
+    - go: master
+
+script:
+  - go get -t -v ./...
+  - diff -u <(echo -n) <(gofmt -d .)
+  - go vet $(go list ./... | grep -v /vendor/)
+  - go test -v -race ./...

@@ -1,0 +1,9 @@
+{
+  "serverid": 1,
+  "host": "0.0.0.0:6666",
+  "localsavepath": "./save",
+  "database": {
+    "dbuser": "root",
+    "dbpassword": "root123456"
+  }
+}
