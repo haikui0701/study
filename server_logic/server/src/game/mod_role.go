@@ -1,7 +1,10 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"server/csvs"
 	"time"
 )
@@ -17,6 +20,9 @@ type ModRole struct {
 	RoleInfo  map[int]*RoleInfo
 	HpPool    int
 	HpCalTime int64
+
+	player *Player
+	path   string
 }
 
 func (self *ModRole) IsHasRole(roleId int) bool {
@@ -27,7 +33,7 @@ func (self *ModRole) GetRoleLevel(roleId int) int {
 	return 80
 }
 
-func (self *ModRole) AddItem(roleId int, num int64, player *Player) {
+func (self *ModRole) AddItem(roleId int, num int64) {
 	config := csvs.GetRoleConfig(roleId)
 	if config == nil {
 		fmt.Println("配置不存在roleId:", roleId)
@@ -45,10 +51,10 @@ func (self *ModRole) AddItem(roleId int, num int64, player *Player) {
 			self.RoleInfo[roleId].GetTimes++
 			if self.RoleInfo[roleId].GetTimes >= csvs.ADD_ROLE_TIME_NORMAL_MIN &&
 				self.RoleInfo[roleId].GetTimes <= csvs.ADD_ROLE_TIME_NORMAL_MAX {
-				player.ModBag.AddItemToBag(config.Stuff, config.StuffNum)
-				player.ModBag.AddItemToBag(config.StuffItem, config.StuffItemNum)
+				self.player.GetModBag().AddItemToBag(config.Stuff, config.StuffNum)
+				self.player.GetModBag().AddItemToBag(config.StuffItem, config.StuffItemNum)
 			} else {
-				player.ModBag.AddItemToBag(config.MaxStuffItem, config.MaxStuffItemNum)
+				self.player.GetModBag().AddItemToBag(config.MaxStuffItem, config.MaxStuffItemNum)
 			}
 		}
 	}
@@ -56,8 +62,8 @@ func (self *ModRole) AddItem(roleId int, num int64, player *Player) {
 	if itemConfig != nil {
 		fmt.Println("获得角色", itemConfig.ItemName, "次数", roleId, "------", self.RoleInfo[roleId].GetTimes, "次")
 	}
-	player.ModIcon.CheckGetIcon(roleId)
-	player.ModCard.CheckGetCard(roleId, 10)
+	self.player.GetModIcon().CheckGetIcon(roleId)
+	self.player.GetModCard().CheckGetCard(roleId, 10)
 }
 
 func (self *ModRole) HandleSendRoleInfo(player *Player) {
@@ -113,7 +119,7 @@ func (self *ModRole) WearRelics(roleInfo *RoleInfo, relics *Relics, player *Play
 
 	oldRelicsKeyId := roleInfo.RelicsInfo[relicsConfig.Pos-1]
 	if oldRelicsKeyId > 0 {
-		oldRelics := player.ModRelics.RelicsInfo[oldRelicsKeyId]
+		oldRelics := player.GetModRelics().RelicsInfo[oldRelicsKeyId]
 		if oldRelics != nil {
 			oldRelics.RoleId = 0
 		}
@@ -122,7 +128,7 @@ func (self *ModRole) WearRelics(roleInfo *RoleInfo, relics *Relics, player *Play
 
 	oldRoleId := relics.RoleId
 	if oldRoleId > 0 {
-		oldRole := player.ModRole.RoleInfo[oldRoleId]
+		oldRole := player.GetModRole().RoleInfo[oldRoleId]
 		if oldRole != nil {
 			oldRole.RelicsInfo[relicsConfig.Pos-1] = 0
 		}
@@ -133,8 +139,8 @@ func (self *ModRole) WearRelics(roleInfo *RoleInfo, relics *Relics, player *Play
 	relics.RoleId = roleInfo.RoleId
 
 	if oldRelicsKeyId > 0 && oldRoleId > 0 {
-		oldRelics := player.ModRelics.RelicsInfo[oldRelicsKeyId]
-		oldRole := player.ModRole.RoleInfo[oldRoleId]
+		oldRelics := player.GetModRelics().RelicsInfo[oldRelicsKeyId]
+		oldRole := player.GetModRole().RoleInfo[oldRoleId]
 		if oldRelics != nil && oldRole != nil {
 			self.WearRelics(oldRole, oldRelics, player)
 		}
@@ -155,7 +161,7 @@ func (self *ModRole) CheckRelicsPos(roleInfo *RoleInfo, pos int) {
 func (self *RoleInfo) ShowInfo(player *Player) {
 	fmt.Println(fmt.Sprintf("当前角色:%s,角色ID:%d", csvs.GetItemName(self.RoleId), self.RoleId))
 
-	weaponNow := player.ModWeapon.WeaponInfo[self.WeaponInfo]
+	weaponNow := player.GetModWeapon().WeaponInfo[self.WeaponInfo]
 	if weaponNow == nil {
 		fmt.Println(fmt.Sprintf("武器:未穿戴"))
 	} else {
@@ -164,7 +170,7 @@ func (self *RoleInfo) ShowInfo(player *Player) {
 
 	suitMap := make(map[int]int)
 	for _, v := range self.RelicsInfo {
-		relicsNow := player.ModRelics.RelicsInfo[v]
+		relicsNow := player.GetModRelics().RelicsInfo[v]
 		if relicsNow == nil {
 			fmt.Println(fmt.Sprintf("未穿戴"))
 			continue
@@ -227,7 +233,7 @@ func (self *ModRole) WearWeapon(roleInfo *RoleInfo, weapon *Weapon, player *Play
 	if roleInfo.WeaponInfo > 0 {
 		oldWeaponKey = roleInfo.WeaponInfo
 		roleInfo.WeaponInfo = 0
-		oldWeapon := player.ModWeapon.WeaponInfo[oldWeaponKey]
+		oldWeapon := player.GetModWeapon().WeaponInfo[oldWeaponKey]
 		if oldWeapon != nil {
 			oldWeapon.RoleId = 0
 		}
@@ -237,7 +243,7 @@ func (self *ModRole) WearWeapon(roleInfo *RoleInfo, weapon *Weapon, player *Play
 	if weapon.RoleId > 0 {
 		oldRoleId = weapon.RoleId
 		weapon.RoleId = 0
-		oldRole := player.ModRole.RoleInfo[oldRoleId]
+		oldRole := player.GetModRole().RoleInfo[oldRoleId]
 		if oldRole != nil {
 			oldRole.WeaponInfo = 0
 		}
@@ -247,9 +253,9 @@ func (self *ModRole) WearWeapon(roleInfo *RoleInfo, weapon *Weapon, player *Play
 	weapon.RoleId = roleInfo.RoleId
 
 	if roleInfo.WeaponInfo > 0 && weapon.RoleId > 0 {
-		oldWeapon := player.ModWeapon.WeaponInfo[oldWeaponKey]
-		oldRole := player.ModRole.RoleInfo[oldRoleId]
-		if oldWeapon!=nil && oldRole!=nil{
+		oldWeapon := player.GetModWeapon().WeaponInfo[oldWeaponKey]
+		oldRole := player.GetModRole().RoleInfo[oldRoleId]
+		if oldWeapon != nil && oldRole != nil {
 			self.WearWeapon(oldRole, oldWeapon, player)
 		}
 	}
@@ -268,4 +274,41 @@ func (self *ModRole) TakeOffWeapon(roleInfo *RoleInfo, weapon *Weapon, player *P
 	//根据位置看是否身上有对应圣遗物
 	roleInfo.WeaponInfo = 0
 	weapon.RoleId = 0
+}
+
+func (self *ModRole) SaveData() {
+	content, err := json.Marshal(self)
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(self.path, content, os.ModePerm)
+	if err != nil {
+		return
+	}
+}
+
+func (self *ModRole) LoadData(player *Player) {
+
+	self.player = player
+	self.path = self.player.localPath + "/role.json"
+
+	configFile, err := ioutil.ReadFile(self.path)
+	if err != nil {
+		fmt.Println("error")
+		return
+	}
+	err = json.Unmarshal(configFile, &self)
+	if err != nil {
+		self.InitData()
+		return
+	}
+
+	if self.RoleInfo == nil {
+		self.RoleInfo = make(map[int]*RoleInfo)
+	}
+	return
+}
+
+func (self *ModRole) InitData() {
+
 }

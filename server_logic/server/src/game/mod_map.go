@@ -1,8 +1,11 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"server/csvs"
 	"time"
 )
@@ -10,6 +13,9 @@ import (
 type Map struct {
 	MapId     int
 	EventInfo map[int]*Event
+
+	player *Player
+	path   string
 }
 
 type Event struct {
@@ -27,6 +33,9 @@ type StatueInfo struct {
 type ModMap struct {
 	MapInfo map[int]*Map
 	Statue  map[int]*StatueInfo
+
+	player *Player
+	path   string
 }
 
 func (self *ModMap) InitData() {
@@ -102,8 +111,8 @@ func (self *ModMap) SetEventState(mapId int, eventId int, state int, player *Pla
 	if configMap == nil {
 		return
 	}
-	if !player.ModBag.HasEnoughItem(eventConfig.CostItem,eventConfig.CostNum){
-		fmt.Println(fmt.Sprintf("%s不足!",csvs.GetItemName(eventConfig.CostItem)))
+	if !player.GetModBag().HasEnoughItem(eventConfig.CostItem, eventConfig.CostNum) {
+		fmt.Println(fmt.Sprintf("%s不足!", csvs.GetItemName(eventConfig.CostItem)))
 		return
 	}
 	if configMap.MapType == csvs.REFRESH_PLAYER && eventConfig.EventType == csvs.EVENT_TYPE_REWARD {
@@ -112,7 +121,7 @@ func (self *ModMap) SetEventState(mapId int, eventId int, state int, player *Pla
 			if eventConfigNow == nil {
 				continue
 			}
-			if eventConfigNow.EventType!= csvs.EVENT_TYPE_NORMAL{
+			if eventConfigNow.EventType != csvs.EVENT_TYPE_NORMAL {
 				continue
 			}
 			if v.EventId == eventId {
@@ -130,18 +139,18 @@ func (self *ModMap) SetEventState(mapId int, eventId int, state int, player *Pla
 		fmt.Println("事件完成")
 	}
 	if state == csvs.EVENT_END {
-		for i:=0;i<eventConfig.EventDropTimes;i++{
+		for i := 0; i < eventConfig.EventDropTimes; i++ {
 			config := csvs.GetDropItemGroupNew(eventConfig.EventDrop)
 			for _, v := range config {
 				randNum := rand.Intn(csvs.PERCENT_ALL)
 				if randNum < v.Weight {
 					randAll := v.ItemNumMax - v.ItemNumMin + 1
 					itemNum := rand.Intn(randAll) + v.ItemNumMin
-					worldLevel := player.ModPlayer.GetWorldLevelNow()
+					worldLevel := player.GetMod(MOD_PLAYER).(*ModPlayer).GetWorldLevelNow()
 					if worldLevel > 0 {
 						itemNum = itemNum * (csvs.PERCENT_ALL + worldLevel*v.WorldAdd) / csvs.PERCENT_ALL
 					}
-					player.ModBag.AddItem(v.ItemId, int64(itemNum), player)
+					player.GetModBag().AddItem(v.ItemId, int64(itemNum))
 				}
 			}
 		}
@@ -250,7 +259,7 @@ func (self *ModMap) NewStatue(statueId int) *StatueInfo {
 	data.ItemInfo = make(map[int]*ItemInfo)
 	return data
 }
-func (self *ModMap) UpStatue(statueId int, player *Player) {
+func (self *ModMap) UpStatue(statueId int) {
 	_, ok := self.Statue[statueId]
 	if !ok {
 		self.Statue[statueId] = self.NewStatue(statueId)
@@ -272,8 +281,8 @@ func (self *ModMap) UpStatue(statueId int, player *Player) {
 	}
 	needNum := nextConfig.CostNum - nowNum
 
-	if !player.ModBag.HasEnoughItem(nextConfig.CostItem, needNum) {
-		num := player.ModBag.GetItemNum(nextConfig.CostItem, player)
+	if !self.player.GetMod(MOD_BAG).(*ModBag).HasEnoughItem(nextConfig.CostItem, needNum) {
+		num := self.player.GetMod(MOD_BAG).(*ModBag).GetItemNum(nextConfig.CostItem)
 		if num <= 0 {
 			fmt.Println(fmt.Sprintf("神像升级物品不足"))
 			return
@@ -289,13 +298,42 @@ func (self *ModMap) UpStatue(statueId int, player *Player) {
 			return
 		}
 		info.ItemInfo[nextConfig.CostItem].ItemNum += num
-		player.ModBag.RemoveItemToBag(nextConfig.CostItem, num, player)
+		self.player.GetModBag().RemoveItemToBag(nextConfig.CostItem, num)
 		fmt.Println(fmt.Sprintf("神像升级,提交物品%d，数量%d，当前数量%d", nextConfig.CostItem, num, info.ItemInfo[nextConfig.CostItem].ItemNum))
 
 	} else {
-		player.ModBag.RemoveItemToBag(nextConfig.CostItem, needNum, player)
+		self.player.GetModBag().RemoveItemToBag(nextConfig.CostItem, needNum)
 		info.Level++
 		info.ItemInfo = make(map[int]*ItemInfo)
 		fmt.Println(fmt.Sprintf("神像升级成功,神像:%d，当前等级:%d", info.StatueId, info.Level))
 	}
+}
+
+func (self *ModMap) SaveData() {
+	content, err := json.Marshal(self)
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(self.path, content, os.ModePerm)
+	if err != nil {
+		return
+	}
+}
+
+func (self *ModMap) LoadData(player *Player) {
+
+	self.player = player
+	self.path = self.player.localPath + "/map.json"
+
+	configFile, err := ioutil.ReadFile(self.path)
+	if err != nil {
+		fmt.Println("error")
+		return
+	}
+	err = json.Unmarshal(configFile, &self)
+	if err != nil {
+		self.InitData()
+		return
+	}
+	return
 }

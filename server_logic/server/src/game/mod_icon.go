@@ -1,7 +1,10 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"server/csvs"
 )
 
@@ -11,6 +14,9 @@ type Icon struct {
 
 type ModIcon struct {
 	IconInfo map[int]*Icon
+
+	player *Player
+	path   string
 }
 
 func (self *ModIcon) IsHasIcon(iconId int) bool {
@@ -39,4 +45,42 @@ func (self *ModIcon) CheckGetIcon(roleId int) {
 		return
 	}
 	self.AddItem(config.IconId)
+}
+
+func (self *ModIcon) SaveData() {
+	content, err := json.Marshal(self)
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(self.path, content, os.ModePerm)
+	if err != nil {
+		return
+	}
+}
+
+func (self *ModIcon) LoadData(player *Player) {
+
+	self.player=player
+	self.path=self.player.localPath+"/icon.json"
+
+	configFile, err := ioutil.ReadFile(self.path)
+	if err != nil {
+		fmt.Println("error")
+		return
+	}
+	err = json.Unmarshal(configFile, &self)
+	if err != nil {
+		self.InitData()
+		return
+	}
+
+	if self.IconInfo==nil{
+		self.IconInfo=make(map[int]*Icon,0)
+	}
+
+	return
+}
+
+func (self *ModIcon) InitData() {
+
 }

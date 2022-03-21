@@ -1,7 +1,10 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"server/csvs"
 )
 
@@ -11,6 +14,9 @@ type Card struct {
 
 type ModCard struct {
 	CardInfo map[int]*Card
+
+	player *Player
+	path   string
 }
 
 func (self *ModCard) IsHasCard(cardId int) bool {
@@ -44,4 +50,41 @@ func (self *ModCard) CheckGetCard(roleId int,friendliness int) {
 		return
 	}
 	self.AddItem(config.CardId,friendliness)
+}
+
+func (self *ModCard) SaveData() {
+	content, err := json.Marshal(self)
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(self.path, content, os.ModePerm)
+	if err != nil {
+		return
+	}
+}
+
+func (self *ModCard) LoadData(player *Player) {
+
+	self.player = player
+	self.path = self.player.localPath + "/card.json"
+
+	configFile, err := ioutil.ReadFile(self.path)
+	if err != nil {
+		fmt.Println("error")
+		return
+	}
+	err = json.Unmarshal(configFile, &self)
+	if err != nil {
+		self.InitData()
+		return
+	}
+
+	if self.CardInfo == nil {
+		self.CardInfo = make(map[int]*Card)
+	}
+	return
+}
+
+func (self *ModCard) InitData() {
+
 }

@@ -1,7 +1,10 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"server/csvs"
 )
 
@@ -12,9 +15,12 @@ type ItemInfo struct {
 
 type ModBag struct {
 	BagInfo map[int]*ItemInfo
+
+	player *Player
+	path   string
 }
 
-func (self *ModBag) AddItem(itemId int, num int64, player *Player) {
+func (self *ModBag) AddItem(itemId int, num int64) {
 	itemConfig := csvs.GetItemConfig(itemId)
 	if itemConfig == nil {
 		fmt.Println(itemId, "物品不存在")
@@ -24,19 +30,19 @@ func (self *ModBag) AddItem(itemId int, num int64, player *Player) {
 	//case csvs.ITEMTYPE_NORMAL:
 	//	self.AddItemToBag(itemId, num)
 	case csvs.ITEMTYPE_ROLE:
-		player.ModRole.AddItem(itemId, num, player)
+		self.player.GetModRole().AddItem(itemId, num)
 	case csvs.ITEMTYPE_ICON:
-		player.ModIcon.AddItem(itemId)
+		self.player.GetModIcon().AddItem(itemId)
 	case csvs.ITEMTYPE_CARD:
-		player.ModCard.AddItem(itemId, 12)
+		self.player.GetModCard().AddItem(itemId, 12)
 	case csvs.ITEMTYPE_WEAPON:
-		player.ModWeapon.AddItem(itemId, num)
+		self.player.GetModWeapon().AddItem(itemId, num)
 	case csvs.ITEMTYPE_RELICS:
-		player.ModRelics.AddItem(itemId, num)
+		self.player.GetModRelics().AddItem(itemId, num)
 	case csvs.ITEMTYPE_COOK:
-		player.ModCook.AddItem(itemId)
+		self.player.GetModCook().AddItem(itemId)
 	case csvs.ITEMTYPE_HOME_ITEM:
-		player.ModHome.AddItem(itemId, num, player)
+		self.player.GetModHome().AddItem(itemId, num)
 	default: //同普通
 		self.AddItemToBag(itemId, num)
 	}
@@ -56,7 +62,7 @@ func (self *ModBag) AddItemToBag(itemId int, num int64) {
 
 }
 
-func (self *ModBag) RemoveItem(itemId int, num int64, player *Player) {
+func (self *ModBag) RemoveItem(itemId int, num int64) {
 	itemConfig := csvs.GetItemConfig(itemId)
 	if itemConfig == nil {
 		fmt.Println(itemId, "物品不存在")
@@ -84,7 +90,7 @@ func (self *ModBag) RemoveItemToBagGM(itemId int, num int64) {
 	}
 }
 
-func (self *ModBag) RemoveItemToBag(itemId int, num int64, player *Player) {
+func (self *ModBag) RemoveItemToBag(itemId int, num int64 ){
 	itemConfig := csvs.GetItemConfig(itemId)
 	switch itemConfig.SortType {
 	//case csvs.ITEMTYPE_NORMAL:
@@ -136,7 +142,7 @@ func (self *ModBag) HasEnoughItem(itemId int, num int64) bool {
 	return true
 }
 
-func (self *ModBag) UseItem(itemId int, num int64, player *Player) {
+func (self *ModBag) UseItem(itemId int, num int64) {
 	itemConfig := csvs.GetItemConfig(itemId)
 	if itemConfig == nil {
 		fmt.Println(itemId, "物品不存在")
@@ -158,7 +164,7 @@ func (self *ModBag) UseItem(itemId int, num int64, player *Player) {
 
 	switch itemConfig.SortType {
 	case csvs.ITEMTYPE_COOKBOOK:
-		self.UseCookBook(itemId, num, player)
+		self.UseCookBook(itemId, num)
 	case csvs.ITEMTYPE_FOOD:
 		//给英雄加属性
 	default: //同普通
@@ -167,17 +173,17 @@ func (self *ModBag) UseItem(itemId int, num int64, player *Player) {
 	}
 }
 
-func (self *ModBag) UseCookBook(itemId int, num int64, player *Player) {
+func (self *ModBag) UseCookBook(itemId int, num int64) {
 	cookBookConfig := csvs.GetCookBookConfig(itemId)
 	if cookBookConfig == nil {
 		fmt.Println(itemId, "物品不存在")
 		return
 	}
-	self.RemoveItem(itemId, num, player)
-	self.AddItem(cookBookConfig.Reward, num, player)
+	self.RemoveItem(itemId, num)
+	self.AddItem(cookBookConfig.Reward, num)
 }
 
-func (self *ModBag) GetItemNum(itemId int, player *Player) int64 {
+func (self *ModBag) GetItemNum(itemId int) int64 {
 	itemConfig := csvs.GetItemConfig(itemId)
 	if itemConfig == nil {
 		return 0
@@ -187,4 +193,41 @@ func (self *ModBag) GetItemNum(itemId int, player *Player) int64 {
 		return 0
 	}
 	return self.BagInfo[itemId].ItemNum
+}
+
+func (self *ModBag) SaveData() {
+	content, err := json.Marshal(self)
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(self.path, content, os.ModePerm)
+	if err != nil {
+		return
+	}
+}
+
+func (self *ModBag) LoadData(player *Player) {
+
+	self.player = player
+	self.path = self.player.localPath + "/bag.json"
+
+	configFile, err := ioutil.ReadFile(self.path)
+	if err != nil {
+		fmt.Println("error")
+		return
+	}
+	err = json.Unmarshal(configFile, &self)
+	if err != nil {
+		self.InitData()
+		return
+	}
+
+	if self.BagInfo == nil {
+		self.BagInfo = make(map[int]*ItemInfo)
+	}
+	return
+}
+
+func (self *ModBag) InitData() {
+
 }

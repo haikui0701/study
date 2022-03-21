@@ -1,8 +1,11 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"server/csvs"
 )
 
@@ -19,6 +22,9 @@ type Relics struct {
 type ModRelics struct {
 	RelicsInfo map[int]*Relics
 	MaxKey     int
+
+	player *Player
+	path   string
 }
 
 func (self *ModRelics) AddItem(itemId int, num int64) {
@@ -266,4 +272,41 @@ func (self *ModRelics) RelicsTestBest(player *Player) {
 	for _, v := range relicsBestInfo {
 		v.ShowInfo()
 	}
+}
+
+func (self *ModRelics) SaveData() {
+	content, err := json.Marshal(self)
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(self.path, content, os.ModePerm)
+	if err != nil {
+		return
+	}
+}
+
+func (self *ModRelics) LoadData(player *Player) {
+
+	self.player = player
+	self.path = self.player.localPath + "/relics.json"
+
+	configFile, err := ioutil.ReadFile(self.path)
+	if err != nil {
+		fmt.Println("error")
+		return
+	}
+	err = json.Unmarshal(configFile, &self)
+	if err != nil {
+		self.InitData()
+		return
+	}
+
+	if self.RelicsInfo == nil {
+		self.RelicsInfo = make(map[int]*Relics)
+	}
+	return
+}
+
+func (self *ModRelics) InitData() {
+
 }

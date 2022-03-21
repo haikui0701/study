@@ -12,57 +12,53 @@ const (
 	TASK_STATE_FINISH = 2
 )
 
-type Player struct {
-	ModPlayer     *ModPlayer
-	ModIcon       *ModIcon
-	ModCard       *ModCard
-	ModUniqueTask *ModUniqueTask
-	ModRole       *ModRole
-	ModBag        *ModBag
-	ModWeapon     *ModWeapon
-	ModRelics     *ModRelics
-	ModCook       *ModCook
-	ModHome       *ModHome
-	ModPool       *ModPool
-	ModMap        *ModMap
+const (
+	MOD_PLAYER     = "player"
+	MOD_ICON       = "icon"
+	MOD_CARD       = "card"
+	MOD_UNIQUETASK = "uniquetask"
+	MOD_ROLE       = "role"
+	MOD_BAG        = "bag"
+	MOD_WEAPON     = "weapon "
+	MOD_RELICS     = "relics"
+	MOD_COOK       = "cook"
+	MOD_HOME       = "home"
+	MOD_POOL       = "pool"
+	MOD_MAP        = "map"
+)
 
-	modManage map[string]interface{}
+type ModBase interface {
+	LoadData(player *Player)
+	SaveData()
+	InitData()
 }
 
-func NewTestPlayer() *Player {
+type Player struct {
+	UserId    int64
+	modManage map[string]ModBase
+	localPath string
+}
+
+func NewTestPlayer(userid int64) *Player {
+	//***************泛型架构***************************
 	player := new(Player)
-	player.ModPlayer = new(ModPlayer)
-	player.ModIcon = new(ModIcon)
-	player.ModIcon.IconInfo = make(map[int]*Icon)
-	player.ModCard = new(ModCard)
-	player.ModCard.CardInfo = make(map[int]*Card)
-	player.ModUniqueTask = new(ModUniqueTask)
-	player.ModUniqueTask.MyTaskInfo = make(map[int]*TaskInfo)
-	//player.ModUniqueTask.Locker = new(sync.RWMutex)
-	player.ModRole = new(ModRole)
-	player.ModRole.RoleInfo = make(map[int]*RoleInfo)
-	player.ModBag = new(ModBag)
-	player.ModBag.BagInfo = make(map[int]*ItemInfo)
-	player.ModWeapon = new(ModWeapon)
-	player.ModWeapon.WeaponInfo = make(map[int]*Weapon)
-	player.ModRelics = new(ModRelics)
-	player.ModRelics.RelicsInfo = make(map[int]*Relics)
-	player.ModCook = new(ModCook)
-	player.ModCook.CookInfo = make(map[int]*Cook)
-	player.ModHome = new(ModHome)
-	player.ModHome.HomeItemIdInfo = make(map[int]*HomeItemId)
-	player.ModPool = new(ModPool)
-	player.ModPool.UpPoolInfo = new(PoolInfo)
-	player.ModMap = new(ModMap)
-	player.ModMap.InitData()
-	//****************************************
-	player.ModPlayer.PlayerLevel = 1
-	player.ModPlayer.Name = "旅行者"
-	player.ModPlayer.WorldLevel = 1
-	player.ModPlayer.WorldLevelNow = 1
-	//****************************************
-	player.ModPlayer.UserId = 10000666
+	player.UserId = userid
+	player.modManage = map[string]ModBase{
+		MOD_PLAYER:     new(ModPlayer),
+		MOD_ICON:       new(ModIcon),
+		MOD_CARD:       new(ModCard),
+		MOD_UNIQUETASK: new(ModUniqueTask),
+		MOD_ROLE:       new(ModRole),
+		MOD_BAG:        new(ModBag),
+		MOD_WEAPON:     new(ModWeapon),
+		MOD_RELICS:     new(ModRelics),
+		MOD_COOK:       new(ModCook),
+		MOD_HOME:       new(ModHome),
+		MOD_POOL:       new(ModPool),
+		MOD_MAP:        new(ModMap),
+	}
 	player.InitData()
+	player.InitMod()
 	return player
 }
 
@@ -75,59 +71,61 @@ func (self *Player) InitData() {
 			return
 		}
 	}
-
-	selfPath := path + fmt.Sprintf("/%d", self.ModPlayer.UserId)
-	_, err = os.Stat(selfPath)
+	self.localPath = path + fmt.Sprintf("/%d", self.UserId)
+	_, err = os.Stat(self.localPath)
 	if err != nil {
-		err = os.Mkdir(selfPath, os.ModePerm)
+		err = os.Mkdir(self.localPath, os.ModePerm)
 		if err != nil {
 			return
 		}
-		self.ModPlayer.SaveData(selfPath+"/player.json")
-	}else{
-		self.ModPlayer.LoadData(selfPath+"/player.json")
+	}
+}
+
+func (self *Player) InitMod() {
+	for _, v := range self.modManage {
+		v.LoadData(self)
 	}
 }
 
 //对外接口
 func (self *Player) RecvSetIcon(iconId int) {
-	self.ModPlayer.SetIcon(iconId, self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).SetIcon(iconId)
 }
 
 func (self *Player) RecvSetCard(cardId int) {
-	self.ModPlayer.SetCard(cardId, self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).SetCard(cardId)
 }
 
 func (self *Player) RecvSetName(name string) {
-	self.ModPlayer.SetName(name, self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).SetName(name)
 }
 
 func (self *Player) RecvSetSign(sign string) {
-	self.ModPlayer.SetSign(sign, self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).SetSign(sign)
 }
 
 func (self *Player) ReduceWorldLevel() {
-	self.ModPlayer.ReduceWorldLevel(self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).ReduceWorldLevel()
 }
 
 func (self *Player) ReturnWorldLevel() {
-	self.ModPlayer.ReturnWorldLevel(self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).ReturnWorldLevel()
 }
 
 func (self *Player) SetBirth(birth int) {
-	self.ModPlayer.SetBirth(birth, self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).SetBirth(birth)
 }
 
 func (self *Player) SetShowCard(showCard []int) {
-	self.ModPlayer.SetShowCard(showCard, self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).SetShowCard(showCard, self)
 }
 
 func (self *Player) SetShowTeam(showRole []int) {
-	self.ModPlayer.SetShowTeam(showRole, self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).SetShowTeam(showRole, self)
 }
 
 func (self *Player) SetHideShowTeam(isHide int) {
-	self.ModPlayer.SetHideShowTeam(isHide, self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).SetHideShowTeam(isHide, self)
 }
 
 func (self *Player) SetEventState(state int) {
@@ -140,7 +138,7 @@ func (self *Player) Run() {
 	fmt.Println("模拟用户创建成功OK------开始测试")
 	fmt.Println("↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓")
 	for {
-		fmt.Println(self.ModPlayer.Name, ",欢迎来到提瓦特大陆,请选择功能：1基础信息2背包3角色(八重神子UP池)4地图5圣遗物6角色7武器8存储数据")
+		fmt.Println(self.GetMod(MOD_PLAYER).(*ModPlayer).Name, ",欢迎来到提瓦特大陆,请选择功能：1基础信息2背包3角色(八重神子UP池)4地图5圣遗物6角色7武器8存储数据")
 		var modChoose int
 		fmt.Scan(&modChoose)
 		switch modChoose {
@@ -159,7 +157,9 @@ func (self *Player) Run() {
 		case 7:
 			self.HandleWeapon()
 		case 8:
-			self.ModPlayer.SaveData(fmt.Sprintf("./save/%d/player.json",self.ModPlayer.UserId))
+			for _,v:=range self.modManage{
+				v.SaveData()
+			}
 		}
 	}
 }
@@ -190,31 +190,31 @@ func (self *Player) HandleBase() {
 }
 
 func (self *Player) HandleBaseGetInfo() {
-	fmt.Println("名字:", self.ModPlayer.Name)
-	fmt.Println("等级:", self.ModPlayer.PlayerLevel)
-	fmt.Println("大世界等级:", self.ModPlayer.WorldLevelNow)
-	if self.ModPlayer.Sign == "" {
+	fmt.Println("名字:", self.GetMod(MOD_PLAYER).(*ModPlayer).Name)
+	fmt.Println("等级:", self.GetMod(MOD_PLAYER).(*ModPlayer).PlayerLevel)
+	fmt.Println("大世界等级:", self.GetMod(MOD_PLAYER).(*ModPlayer).WorldLevelNow)
+	if self.GetMod(MOD_PLAYER).(*ModPlayer).Sign == "" {
 		fmt.Println("签名:", "未设置")
 	} else {
-		fmt.Println("签名:", self.ModPlayer.Sign)
+		fmt.Println("签名:", self.GetMod(MOD_PLAYER).(*ModPlayer).Sign)
 	}
 
-	if self.ModPlayer.Icon == 0 {
+	if self.GetMod(MOD_PLAYER).(*ModPlayer).Icon == 0 {
 		fmt.Println("头像:", "未设置")
 	} else {
-		fmt.Println("头像:", csvs.GetItemConfig(self.ModPlayer.Icon), self.ModPlayer.Icon)
+		fmt.Println("头像:", csvs.GetItemConfig(self.GetMod(MOD_PLAYER).(*ModPlayer).Icon), self.GetMod(MOD_PLAYER).(*ModPlayer).Icon)
 	}
 
-	if self.ModPlayer.Card == 0 {
+	if self.GetMod(MOD_PLAYER).(*ModPlayer).Card == 0 {
 		fmt.Println("名片:", "未设置")
 	} else {
-		fmt.Println("名片:", csvs.GetItemConfig(self.ModPlayer.Card), self.ModPlayer.Card)
+		fmt.Println("名片:", csvs.GetItemConfig(self.GetMod(MOD_PLAYER).(*ModPlayer).Card), self.GetMod(MOD_PLAYER).(*ModPlayer).Card)
 	}
 
-	if self.ModPlayer.Birth == 0 {
+	if self.GetMod(MOD_PLAYER).(*ModPlayer).Birth == 0 {
 		fmt.Println("生日:", "未设置")
 	} else {
-		fmt.Println("生日:", self.ModPlayer.Birth/100, "月", self.ModPlayer.Birth%100, "日")
+		fmt.Println("生日:", self.GetMod(MOD_PLAYER).(*ModPlayer).Birth/100, "月", self.GetMod(MOD_PLAYER).(*ModPlayer).Birth%100, "日")
 	}
 }
 
@@ -250,7 +250,7 @@ func (self *Player) HandleBagSetIcon() {
 
 func (self *Player) HandleBagSetIconGetInfo() {
 	fmt.Println("当前拥有头像如下:")
-	for _, v := range self.ModIcon.IconInfo {
+	for _, v := range self.GetModIcon().IconInfo {
 		config := csvs.GetItemConfig(v.IconId)
 		if config != nil {
 			fmt.Println(config.ItemName, ":", config.ItemId)
@@ -283,7 +283,7 @@ func (self *Player) HandleBagSetCard() {
 
 func (self *Player) HandleBagSetCardGetInfo() {
 	fmt.Println("当前拥有名片如下:")
-	for _, v := range self.ModCard.CardInfo {
+	for _, v := range self.GetModCard().CardInfo {
 		config := csvs.GetItemConfig(v.CardId)
 		if config != nil {
 			fmt.Println(config.ItemName, ":", config.ItemId)
@@ -299,7 +299,7 @@ func (self *Player) HandleBagSetCardSet() {
 }
 
 func (self *Player) HandleBagSetBirth() {
-	if self.ModPlayer.Birth > 0 {
+	if self.GetMod(MOD_PLAYER).(*ModPlayer).Birth > 0 {
 		fmt.Println("已设置过生日!")
 		return
 	}
@@ -308,7 +308,7 @@ func (self *Player) HandleBagSetBirth() {
 	fmt.Scan(&month)
 	fmt.Println("请输入日:")
 	fmt.Scan(&day)
-	self.ModPlayer.SetBirth(month*100+day, self)
+	self.GetMod(MOD_PLAYER).(*ModPlayer).SetBirth(month*100 + day)
 }
 
 //背包
@@ -343,36 +343,36 @@ func (self *Player) HandlePool() {
 		case 0:
 			return
 		case 1:
-			self.ModRole.HandleSendRoleInfo(self)
+			self.GetModRole().HandleSendRoleInfo(self)
 		case 2:
-			self.ModPool.HandleUpPoolTen(self)
+			self.GetModPool().HandleUpPoolTen(self)
 		case 3:
 			fmt.Println("请输入抽卡次数,最大值1亿(最大耗时约30秒):")
 			var times int
 			fmt.Scan(&times)
-			self.ModPool.HandleUpPoolSingle(times, self)
+			self.GetModPool().HandleUpPoolSingle(times, self)
 		case 4:
 			fmt.Println("请输入抽卡次数,最大值1亿(最大耗时约30秒):")
 			var times int
 			fmt.Scan(&times)
-			self.ModPool.HandleUpPoolTimesTest(times)
+			self.GetModPool().HandleUpPoolTimesTest(times)
 		case 5:
 			fmt.Println("请输入抽卡次数,最大值1亿(最大耗时约30秒):")
 			var times int
 			fmt.Scan(&times)
-			self.ModPool.HandleUpPoolFiveTest(times)
+			self.GetModPool().HandleUpPoolFiveTest(times)
 		case 6:
-			self.ModPool.DoUpPool()
+			self.GetModPool().DoUpPool()
 		case 7:
 			fmt.Println("请输入抽卡次数,最大值1亿(最大耗时约30秒):")
 			var times int
 			fmt.Scan(&times)
-			self.ModPool.HandleUpPoolSingleCheck1(times, self)
+			self.GetModPool().HandleUpPoolSingleCheck1(times, self)
 		case 8:
 			fmt.Println("请输入抽卡次数,最大值1亿(最大耗时约30秒):")
 			var times int
 			fmt.Scan(&times)
-			self.ModPool.HandleUpPoolSingleCheck2(times, self)
+			self.GetModPool().HandleUpPoolSingleCheck2(times, self)
 		}
 	}
 }
@@ -384,7 +384,7 @@ func (self *Player) HandleBagAddItem() {
 	fmt.Scan(&itemId)
 	fmt.Println("物品数量")
 	fmt.Scan(&itemNum)
-	self.ModBag.AddItem(itemId, int64(itemNum), self)
+	self.GetModBag().AddItem(itemId, int64(itemNum))
 }
 
 func (self *Player) HandleBagRemoveItem() {
@@ -394,7 +394,7 @@ func (self *Player) HandleBagRemoveItem() {
 	fmt.Scan(&itemId)
 	fmt.Println("物品数量")
 	fmt.Scan(&itemNum)
-	self.ModBag.RemoveItemToBag(itemId, int64(itemNum), self)
+	self.GetModBag().RemoveItemToBag(itemId, int64(itemNum))
 }
 
 func (self *Player) HandleBagUseItem() {
@@ -404,13 +404,13 @@ func (self *Player) HandleBagUseItem() {
 	fmt.Scan(&itemId)
 	fmt.Println("物品数量")
 	fmt.Scan(&itemNum)
-	self.ModBag.UseItem(itemId, int64(itemNum), self)
+	self.GetModBag().UseItem(itemId, int64(itemNum))
 }
 
 func (self *Player) HandleBagWindStatue() {
 	fmt.Println("开始升级七天神像")
-	self.ModMap.UpStatue(1, self)
-	self.ModRole.CalHpPool()
+	self.GetModMap().UpStatue(1)
+	self.GetModRole().CalHpPool()
 }
 
 //地图
@@ -436,9 +436,9 @@ func (self *Player) HandleMapIn(mapId int) {
 		fmt.Println("无法识别的地图")
 		return
 	}
-	self.ModMap.RefreshByPlayer(mapId)
+	self.GetModMap().RefreshByPlayer(mapId)
 	for {
-		self.ModMap.GetEventList(config)
+		self.GetModMap().GetEventList(config)
 		fmt.Println("请选择触发事件Id(0返回)")
 		var action int
 		fmt.Scan(&action)
@@ -451,7 +451,7 @@ func (self *Player) HandleMapIn(mapId int) {
 				fmt.Println("无法识别的事件")
 				break
 			}
-			self.ModMap.SetEventState(mapId, eventConfig.EventId, csvs.EVENT_END, self)
+			self.GetModMap().SetEventState(mapId, eventConfig.EventId, csvs.EVENT_END, self)
 		}
 	}
 }
@@ -465,11 +465,11 @@ func (self *Player) HandleRelics() {
 		case 0:
 			return
 		case 1:
-			self.ModRelics.RelicsUp(self)
+			self.GetModRelics().RelicsUp(self)
 		case 2:
-			self.ModRelics.RelicsTop(self)
+			self.GetModRelics().RelicsTop(self)
 		case 3:
-			self.ModRelics.RelicsTestBest(self)
+			self.GetModRelics().RelicsTestBest(self)
 		default:
 			fmt.Println("无法识别在操作")
 		}
@@ -485,7 +485,7 @@ func (self *Player) HandleRole() {
 		case 0:
 			return
 		case 1:
-			self.ModRole.HandleSendRoleInfo(self)
+			self.GetModRole().HandleSendRoleInfo(self)
 		case 2:
 			self.HandleWearRelics()
 		case 3:
@@ -510,7 +510,7 @@ func (self *Player) HandleWearRelics() {
 			return
 		}
 
-		RoleInfo := self.ModRole.RoleInfo[roleId]
+		RoleInfo := self.GetModRole().RoleInfo[roleId]
 		if RoleInfo == nil {
 			fmt.Println("英雄不存在")
 			continue
@@ -523,12 +523,12 @@ func (self *Player) HandleWearRelics() {
 		if relicsKey == 0 {
 			return
 		}
-		relics := self.ModRelics.RelicsInfo[relicsKey]
+		relics := self.GetModRelics().RelicsInfo[relicsKey]
 		if relics == nil {
 			fmt.Println("圣遗物不存在")
 			continue
 		}
-		self.ModRole.WearRelics(RoleInfo, relics, self)
+		self.GetModRole().WearRelics(RoleInfo, relics, self)
 	}
 }
 
@@ -542,7 +542,7 @@ func (self *Player) HandleTakeOffRelics() {
 			return
 		}
 
-		RoleInfo := self.ModRole.RoleInfo[roleId]
+		RoleInfo := self.GetModRole().RoleInfo[roleId]
 		if RoleInfo == nil {
 			fmt.Println("英雄不存在")
 			continue
@@ -555,12 +555,12 @@ func (self *Player) HandleTakeOffRelics() {
 		if relicsKey == 0 {
 			return
 		}
-		relics := self.ModRelics.RelicsInfo[relicsKey]
+		relics := self.GetModRelics().RelicsInfo[relicsKey]
 		if relics == nil {
 			fmt.Println("圣遗物不存在")
 			continue
 		}
-		self.ModRole.TakeOffRelics(RoleInfo, relics, self)
+		self.GetModRole().TakeOffRelics(RoleInfo, relics, self)
 	}
 }
 
@@ -587,7 +587,7 @@ func (self *Player) HandleWeapon() {
 func (self *Player) HandleWeaponUp() {
 	for {
 		fmt.Println("输入操作的目标武器keyId:,0返回")
-		for _, v := range self.ModWeapon.WeaponInfo {
+		for _, v := range self.GetModWeapon().WeaponInfo {
 			fmt.Println(fmt.Sprintf("武器keyId:%d,等级:%d,突破等级:%d,精炼:%d",
 				v.KeyId, v.Level, v.StarLevel, v.RefineLevel))
 		}
@@ -596,14 +596,14 @@ func (self *Player) HandleWeaponUp() {
 		if weaponKeyId == 0 {
 			return
 		}
-		self.ModWeapon.WeaponUp(weaponKeyId, self)
+		self.GetModWeapon().WeaponUp(weaponKeyId, self)
 	}
 }
 
 func (self *Player) HandleWeaponStarUp() {
 	for {
 		fmt.Println("输入操作的目标武器keyId:,0返回")
-		for _, v := range self.ModWeapon.WeaponInfo {
+		for _, v := range self.GetModWeapon().WeaponInfo {
 			fmt.Println(fmt.Sprintf("武器keyId:%d,等级:%d,突破等级:%d,精炼:%d",
 				v.KeyId, v.Level, v.StarLevel, v.RefineLevel))
 		}
@@ -612,14 +612,14 @@ func (self *Player) HandleWeaponStarUp() {
 		if weaponKeyId == 0 {
 			return
 		}
-		self.ModWeapon.WeaponUpStar(weaponKeyId, self)
+		self.GetModWeapon().WeaponUpStar(weaponKeyId, self)
 	}
 }
 
 func (self *Player) HandleWeaponRefineUp() {
 	for {
 		fmt.Println("输入操作的目标武器keyId:,0返回")
-		for _, v := range self.ModWeapon.WeaponInfo {
+		for _, v := range self.GetModWeapon().WeaponInfo {
 			fmt.Println(fmt.Sprintf("武器keyId:%d,等级:%d,突破等级:%d,精炼:%d",
 				v.KeyId, v.Level, v.StarLevel, v.RefineLevel))
 		}
@@ -635,7 +635,7 @@ func (self *Player) HandleWeaponRefineUp() {
 			if weaponTargetKeyId == 0 {
 				return
 			}
-			self.ModWeapon.WeaponUpRefine(weaponKeyId, weaponTargetKeyId, self)
+			self.GetModWeapon().WeaponUpRefine(weaponKeyId, weaponTargetKeyId, self)
 		}
 	}
 }
@@ -650,7 +650,7 @@ func (self *Player) HandleWearWeapon() {
 			return
 		}
 
-		RoleInfo := self.ModRole.RoleInfo[roleId]
+		RoleInfo := self.GetModRole().RoleInfo[roleId]
 		if RoleInfo == nil {
 			fmt.Println("英雄不存在")
 			continue
@@ -663,12 +663,12 @@ func (self *Player) HandleWearWeapon() {
 		if weaponKey == 0 {
 			return
 		}
-		weaponInfo := self.ModWeapon.WeaponInfo[weaponKey]
+		weaponInfo := self.GetModWeapon().WeaponInfo[weaponKey]
 		if weaponInfo == nil {
 			fmt.Println("武器不存在")
 			continue
 		}
-		self.ModRole.WearWeapon(RoleInfo, weaponInfo, self)
+		self.GetModRole().WearWeapon(RoleInfo, weaponInfo, self)
 		RoleInfo.ShowInfo(self)
 	}
 }
@@ -683,7 +683,7 @@ func (self *Player) HandleTakeOffWeapon() {
 			return
 		}
 
-		RoleInfo := self.ModRole.RoleInfo[roleId]
+		RoleInfo := self.GetModRole().RoleInfo[roleId]
 		if RoleInfo == nil {
 			fmt.Println("英雄不存在")
 			continue
@@ -696,12 +696,64 @@ func (self *Player) HandleTakeOffWeapon() {
 		if weaponKey == 0 {
 			return
 		}
-		weapon := self.ModWeapon.WeaponInfo[weaponKey]
+		weapon := self.GetModWeapon().WeaponInfo[weaponKey]
 		if weapon == nil {
 			fmt.Println("武器不存在")
 			continue
 		}
-		self.ModRole.TakeOffWeapon(RoleInfo, weapon, self)
+		self.GetModRole().TakeOffWeapon(RoleInfo, weapon, self)
 		RoleInfo.ShowInfo(self)
 	}
+}
+
+func (self *Player) GetMod(modName string) ModBase {
+	return self.modManage[modName]
+}
+
+func (self *Player) GetModPlayer() *ModPlayer {
+	return self.modManage[MOD_PLAYER].(*ModPlayer)
+}
+
+func (self *Player) GetModIcon() *ModIcon {
+	return self.modManage[MOD_ICON].(*ModIcon)
+}
+
+func (self *Player) GetModCard() *ModCard {
+	return self.modManage[MOD_CARD].(*ModCard)
+}
+
+func (self *Player) GetModUniqueTask() *ModUniqueTask {
+	return self.modManage[MOD_UNIQUETASK].(*ModUniqueTask)
+}
+
+func (self *Player) GetModRole() *ModRole {
+	return self.modManage[MOD_ROLE].(*ModRole)
+}
+
+func (self *Player) GetModBag() *ModBag {
+	return self.modManage[MOD_BAG].(*ModBag)
+}
+
+func (self *Player) GetModWeapon() *ModWeapon {
+	return self.modManage[MOD_WEAPON].(*ModWeapon)
+}
+
+func (self *Player) GetModRelics() *ModRelics {
+	return self.modManage[MOD_RELICS].(*ModRelics)
+}
+
+func (self *Player) GetModCook() *ModCook {
+	return self.modManage[MOD_COOK].(*ModCook)
+}
+
+func (self *Player) GetModHome() *ModHome {
+	return self.modManage[MOD_HOME].(*ModHome)
+}
+
+func (self *Player) GetModPool() *ModPool {
+	return self.modManage[MOD_POOL].(*ModPool)
+}
+
+func (self *Player) GetModMap() *ModMap {
+	return self.modManage[MOD_MAP].(*ModMap)
 }

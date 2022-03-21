@@ -53,7 +53,8 @@ func (self *Server) Start() {
 	go GetManageBanWord().Run()
 
 	//fmt.Printf("数据测试----start\n")
-	playerTest := NewTestPlayer()
+
+	playerTest := NewTestPlayer(10000666)
 	go playerTest.Run()
 	go self.SignalHandle()
 

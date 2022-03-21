@@ -1,7 +1,10 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"server/csvs"
 )
 
@@ -18,6 +21,9 @@ type Weapon struct {
 type ModWeapon struct {
 	WeaponInfo map[int]*Weapon
 	MaxKey     int
+
+	player *Player
+	path   string
 }
 
 func (self *ModWeapon) AddItem(itemId int, num int64) {
@@ -127,4 +133,41 @@ func (self *ModWeapon) WeaponUpRefine(keyId int, targetKeyId int, player *Player
 	weapon.RefineLevel++
 	delete(self.WeaponInfo,targetKeyId)
 	weapon.ShowInfo()
+}
+
+func (self *ModWeapon) SaveData() {
+	content, err := json.Marshal(self)
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(self.path, content, os.ModePerm)
+	if err != nil {
+		return
+	}
+}
+
+func (self *ModWeapon) LoadData(player *Player) {
+
+	self.player = player
+	self.path = self.player.localPath + "/weapon.json"
+
+	configFile, err := ioutil.ReadFile(self.path)
+	if err != nil {
+		fmt.Println("error")
+		return
+	}
+	err = json.Unmarshal(configFile, &self)
+	if err != nil {
+		self.InitData()
+		return
+	}
+
+	if self.WeaponInfo == nil {
+		self.WeaponInfo = make(map[int]*Weapon)
+	}
+	return
+}
+
+func (self *ModWeapon) InitData() {
+
 }
