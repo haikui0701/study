@@ -10,9 +10,5 @@ func main() {
 
 	game.GetServer().Start()
 
-	for{
-
-	}
-
 	return
 }

@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"golang.org/x/net/websocket"
 	"os"
 	"server/csvs"
 )
@@ -37,11 +38,14 @@ type Player struct {
 	UserId    int64
 	modManage map[string]ModBase
 	localPath string
+	ws        *websocket.Conn
 }
+
+var player *Player
 
 func NewTestPlayer(userid int64) *Player {
 	//***************泛型架构***************************
-	player := new(Player)
+	player = new(Player)
 	player.UserId = userid
 	player.modManage = map[string]ModBase{
 		MOD_PLAYER:     new(ModPlayer),
@@ -157,7 +161,7 @@ func (self *Player) Run() {
 		case 7:
 			self.HandleWeapon()
 		case 8:
-			for _,v:=range self.modManage{
+			for _, v := range self.modManage {
 				v.SaveData()
 			}
 		}

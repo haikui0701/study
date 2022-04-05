@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/signal"
 	"regexp"
@@ -24,6 +25,7 @@ type ServerConfig struct {
 	Host          string    `json:"host" `
 	LocalSavePath string    `json:"localsavepath"` //! 本地存储路径
 	DBConfig      *DBConfig `json:"database" `
+	HttpHost      string    `json:"httphost" `
 }
 
 type Server struct {
@@ -51,12 +53,14 @@ func (self *Server) Start() {
 	rand.Seed(time.Now().Unix())
 	csvs.CheckLoadCsv()
 	go GetManageBanWord().Run()
+	go GetManageHttp().InitData()
 
 	//fmt.Printf("数据测试----start\n")
-
 	playerTest := NewTestPlayer(10000666)
 	go playerTest.Run()
 	go self.SignalHandle()
+
+	http.ListenAndServe(GetServer().Config.Host, nil)
 
 	self.Wait.Wait()
 	fmt.Println("服务器关闭成功!")
