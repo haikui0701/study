@@ -668,6 +668,7 @@ func (self *ModPool) LoadData(player *Player) {
 
 	configFile, err := ioutil.ReadFile(self.path)
 	if err != nil {
+		self.InitData()
 		fmt.Println("error")
 		return
 	}
@@ -684,5 +685,89 @@ func (self *ModPool) LoadData(player *Player) {
 }
 
 func (self *ModPool) InitData() {
+	self.UpPoolInfo=new(PoolInfo)
+}
 
+func (self *ModPool) HandleUpPoolTenByMsg(msg []byte) {
+
+	var msgInfo MsgPool
+	msgErr:=json.Unmarshal(msg,&msgInfo)
+	if msgErr!=nil{
+		fmt.Println("消息解析失败！")
+		return
+	}
+
+	//msgInfo.PoolType
+	for i := 0; i < 10; i++ {
+		self.AddTimes()
+		dropGroup := csvs.ConfigDropGroupMap[1000]
+		if dropGroup == nil {
+			return
+		}
+
+		if self.UpPoolInfo.FiveStarTimes > csvs.FIVE_STAR_TIMES_LIMIT || self.UpPoolInfo.FourStarTimes > csvs.FOUR_STAR_TIMES_LIMIT {
+			newDropGroup := new(csvs.DropGroup)
+			newDropGroup.DropId = dropGroup.DropId
+			newDropGroup.WeightAll = dropGroup.WeightAll
+			addFiveWeight := (self.UpPoolInfo.FiveStarTimes - csvs.FIVE_STAR_TIMES_LIMIT) * csvs.FIVE_STAR_TIMES_LIMIT_EACH_VALUE
+			if addFiveWeight < 0 {
+				addFiveWeight = 0
+			}
+			addFourWeight := (self.UpPoolInfo.FourStarTimes - csvs.FOUR_STAR_TIMES_LIMIT) * csvs.FOUR_STAR_TIMES_LIMIT_EACH_VALUE
+			if addFourWeight < 0 {
+				addFourWeight = 0
+			}
+
+			for _, config := range dropGroup.DropConfigs {
+				newConfig := new(csvs.ConfigDrop)
+				newConfig.Result = config.Result
+				newConfig.DropId = config.DropId
+				newConfig.IsEnd = config.IsEnd
+				if config.Result == 10001 {
+					newConfig.Weight = config.Weight + addFiveWeight
+				} else if config.Result == 10002 {
+					newConfig.Weight = config.Weight + addFourWeight
+				} else if config.Result == 10003 {
+					newConfig.Weight = config.Weight - addFiveWeight - addFourWeight
+				}
+				newDropGroup.DropConfigs = append(newDropGroup.DropConfigs, newConfig)
+			}
+			dropGroup = newDropGroup
+		}
+		roleIdConfig := csvs.GetRandDropNew(dropGroup)
+		if roleIdConfig != nil {
+			roleConfig := csvs.GetRoleConfig(roleIdConfig.Result)
+			if roleConfig != nil {
+				if roleConfig.Star == 5 {
+					self.UpPoolInfo.FiveStarTimes = 0
+					if self.UpPoolInfo.IsMustUp == csvs.LOGIC_TRUE {
+						dropGroup := csvs.ConfigDropGroupMap[100012]
+						if dropGroup != nil {
+							roleIdConfig = csvs.GetRandDropNew(dropGroup)
+							if roleIdConfig == nil {
+								fmt.Println("数据异常")
+								return
+							}
+						}
+					}
+					if roleIdConfig.DropId == 100012 {
+						self.UpPoolInfo.IsMustUp = csvs.LOGIC_FALSE
+					} else {
+						self.UpPoolInfo.IsMustUp = csvs.LOGIC_TRUE
+					}
+				} else if roleConfig.Star == 4 {
+					self.UpPoolInfo.FourStarTimes = 0
+				}
+			}
+			//fmt.Println(fmt.Sprintf("第%d抽抽中:%s", i+1, csvs.GetItemName(roleIdConfig.Result)))
+			player.GetModBag().AddItem(roleIdConfig.Result, 1)
+		}
+	}
+	if self.UpPoolInfo.IsMustUp == csvs.LOGIC_FALSE {
+		fmt.Println(fmt.Sprintf("当前处于小保底区间！"))
+	} else {
+		fmt.Println(fmt.Sprintf("当前处于大保底区间！"))
+	}
+	fmt.Println(fmt.Sprintf("当前累计未出5星次数：%d", self.UpPoolInfo.FiveStarTimes))
+	fmt.Println(fmt.Sprintf("当前累计未出4星次数：%d", self.UpPoolInfo.FourStarTimes))
 }

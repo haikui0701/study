@@ -65,7 +65,7 @@ func (self *ModIcon) LoadData(player *Player) {
 
 	configFile, err := ioutil.ReadFile(self.path)
 	if err != nil {
-		fmt.Println("error")
+		self.InitData()
 		return
 	}
 	err = json.Unmarshal(configFile, &self)
@@ -82,5 +82,7 @@ func (self *ModIcon) LoadData(player *Player) {
 }
 
 func (self *ModIcon) InitData() {
-
+	if self.IconInfo==nil{
+		self.IconInfo=make(map[int]*Icon,0)
+	}
 }

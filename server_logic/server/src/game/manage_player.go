@@ -1,8 +1,10 @@
 package game
 
 import (
+	"fmt"
 	"golang.org/x/net/websocket"
 	"sync"
+	"time"
 )
 
 var managePlayer *ManagePlayer
@@ -21,29 +23,63 @@ func GetManagePlayer() *ManagePlayer {
 	return managePlayer
 }
 
-func (self *ManagePlayer) GetPlayer(uid int64) *Player {
-	self.lock.RLock()
-	defer self.lock.RUnlock()
-	return self.Players[uid]
-}
-
-func (self *ManagePlayer) CreatePlayer(uid int64) *Player {
+func (self *ManagePlayer) PlayerLoginIn(ws *websocket.Conn, userId int64) *Player {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
-	_, ok := self.Players[uid]
+	playerInfo, ok := self.Players[userId]
 	if ok {
-		return self.Players[uid]
+		//顶号
+		if player.ws != ws {
+			oldWs := player.ws
+			playerInfo.ws = ws
+			playerInfo.exitTime = 0
+			if oldWs != nil {
+				oldWs.Write([]byte("账号在别处登陆"))
+				oldWs.Close()
+			}
+		}
 	}
-	self.Players[uid] = NewTestPlayer(uid)
-	return self.Players[uid]
+
+	playerInfo = NewTestPlayer(ws, userId)
+	self.Players[userId] = playerInfo
+
+	return playerInfo
 }
 
-func (self *ManagePlayer) PlayerLoginIn(ws *websocket.Conn, userId int64) *Player {
-	playerInfo := self.GetPlayer(userId)
-	if playerInfo == nil {
-		playerInfo = self.CreatePlayer(userId)
+func (self *ManagePlayer) PlayerClose(ws *websocket.Conn, userId int64) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	playerInfo, ok := self.Players[userId]
+	if ok {
+		//顶号
+		if playerInfo.ws == ws {
+			playerInfo.ws = nil
+			playerInfo.exitTime = time.Now().Unix() + 10
+			fmt.Println("websocket连接断开,ws设置为空")
+		}
 	}
-	playerInfo.ws = ws
-	return playerInfo
+	return
+}
+
+func (self *ManagePlayer) Run() {
+	ticker := time.NewTicker(time.Second * 20)
+	for {
+		select {
+		case <-ticker.C:
+			self.CheckPlayerOff()
+		}
+	}
+}
+
+func (self *ManagePlayer) CheckPlayerOff() {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+	for k, v := range self.Players {
+		if v.exitTime > time.Now().Unix() {
+			fmt.Println("内存中清除角色:", v.UserId)
+			delete(self.Players, k)
+		}
+	}
 }

@@ -54,9 +54,10 @@ func (self *Server) Start() {
 	csvs.CheckLoadCsv()
 	go GetManageBanWord().Run()
 	go GetManageHttp().InitData()
+	go GetManagePlayer().Run()
 
 	//fmt.Printf("数据测试----start\n")
-	playerTest := NewTestPlayer(10000666)
+	playerTest := NewTestPlayer(nil, 10000666)
 	go playerTest.Run()
 	go self.SignalHandle()
 

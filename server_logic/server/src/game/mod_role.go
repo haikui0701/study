@@ -294,7 +294,7 @@ func (self *ModRole) LoadData(player *Player) {
 
 	configFile, err := ioutil.ReadFile(self.path)
 	if err != nil {
-		fmt.Println("error")
+		self.InitData()
 		return
 	}
 	err = json.Unmarshal(configFile, &self)
@@ -310,5 +310,7 @@ func (self *ModRole) LoadData(player *Player) {
 }
 
 func (self *ModRole) InitData() {
-
+	if self.RoleInfo == nil {
+		self.RoleInfo = make(map[int]*RoleInfo)
+	}
 }
